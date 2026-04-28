@@ -18,6 +18,7 @@ def batched(start: int, end: int, batch_size: int):
         yield cur, min(end, cur + batch_size - 1)
         cur += batch_size
 
+
 def process_card_id(card_id: int) -> dict:
     sess = get_session()
     time.sleep(random.uniform(config.DELAY_MIN, config.DELAY_MAX))
@@ -61,75 +62,94 @@ def process_card_id(card_id: int) -> dict:
 
     for comp in parsed["comparative_tables"]:
         file_id = comp["file_id"]
-        ext = comp["ext"] or ".bin"
+        ext = (comp["ext"] or ".bin").lower()
         title = comp["title"]
         file_name = comp["file_name"] or f"card_{card_id}_comparative_{file_id}"
 
-        base_name = safe_filename(file_name)
-        out_path = os.path.join(config.FILES_DIR, base_name)
-        if not out_path.lower().endswith(ext.lower()):
-            out_path += ext
+        # --- кінцевий PDF шлях (ВСІ PDF В ОДНУ ПАПКУ)
+        pdf_base = safe_filename(file_name)
+        pdf_path = os.path.join(config.PDF_DIR, pdf_base + ".pdf")
 
-        download_status = "SKIP_EXISTS"
-        mime = ""
-        pdf_path = ""
-        convert_status = ""
-
-        # 1) Якщо файл  існує
-        if os.path.exists(out_path):
-            if ext.lower() == ".pdf":
-                pdf_path = out_path
-                convert_status = "SKIP_ALREADY_PDF"
-
-            elif ext.lower() == ".docx":
-                # Word COM: конвертація
-                with config.convert_semaphore: 
-                    conv_ok, pdf_path, conv_err = convert_docx_to_pdf_word(out_path, config.PDF_DIR)
-                convert_status = "OK" if conv_ok else f"FAIL: {conv_err}"
-
-            else:
-                convert_status = "SKIP_NOT_DOCX_OR_PDF"
-
+        # Якщо PDF вже існує - пропускаємо
+        if os.path.exists(pdf_path) and os.path.getsize(pdf_path) > 0:
             comp_rows.append([
                 card_id, reg_num, reg_date.isoformat(),
                 file_id, ext, file_name, title,
-                out_path, download_status, mime,
-                pdf_path, convert_status
+                "",                  # tmp_path
+                "SKIP_EXISTS",       # download_status
+                "",                  # mime_type
+                pdf_path,            # pdf_path
+                "SKIP_ALREADY_PDF"   # convert_status
             ])
             continue
 
-        # 2) Якщо не існує
-        ok, mime, err = download_file_by_chunks(sess, file_id, out_path)
-        download_status = "OK" if ok else f"FAIL: {err}"
+        # --- тимчасовий шлях для завантаження (DOCX/PDF з сервера)
+        tmp_name = safe_filename(file_name)
+        tmp_path = os.path.join(config.FILES_DIR, tmp_name)
+        if not tmp_path.lower().endswith(ext):
+            tmp_path += ext
 
-        if ok:
+        download_status = ""
+        mime = ""
+        convert_status = ""
+        out_pdf_path = ""
+
+        # качаємо тільки якщо tmp ще нема (або якщо 0 байт)
+        need_download = not os.path.exists(tmp_path) or os.path.getsize(tmp_path) == 0
+
+        if need_download:
+            ok, mime, err = download_file_by_chunks(sess, file_id, tmp_path)
+            download_status = "OK" if ok else f"FAIL: {err}"
+            if not ok:
+                comp_rows.append([
+                    card_id, reg_num, reg_date.isoformat(),
+                    file_id, ext, file_name, title,
+                    tmp_path, download_status, mime,
+                    "", "SKIP_NO_FILE"
+                ])
+                continue
             downloaded += 1
-
-            if ext.lower() == ".pdf":
-                pdf_path = out_path
+        else:
+            download_status = "SKIP_TMP_EXISTS"
+            
+        if ext == ".pdf":
+            try:
+                os.replace(tmp_path, pdf_path)
+                out_pdf_path = pdf_path
                 convert_status = "SKIP_ALREADY_PDF"
+            except Exception as e:
+                convert_status = f"FAIL_MOVE_PDF: {e}"
 
-            elif ext.lower() == ".docx":
-                with config.convert_semaphore:
-                    conv_ok, pdf_path, conv_err = convert_docx_to_pdf_word(out_path, config.PDF_DIR)
-                convert_status = "OK" if conv_ok else f"FAIL: {conv_err}"
+        elif ext == ".docx":
+            with config.convert_semaphore:
+                conv_ok, out_pdf_path, conv_err = convert_docx_to_pdf_word(tmp_path, config.PDF_DIR)
 
-            else:
-                convert_status = "SKIP_NOT_DOCX_OR_PDF"
+            convert_status = "OK" if conv_ok else f"FAIL: {conv_err}"
+
+            if conv_ok:
+                try:
+                    if os.path.exists(tmp_path):
+                        os.remove(tmp_path)
+                except Exception as e:
+                    convert_status = f"OK_BUT_DOCX_NOT_DELETED: {e}"
+
+        else:
+            convert_status = "SKIP_UNSUPPORTED_EXT"
 
         comp_rows.append([
             card_id, reg_num, reg_date.isoformat(),
             file_id, ext, file_name, title,
-            out_path, download_status, mime,
-            pdf_path, convert_status
+            tmp_path, download_status, mime,
+            out_pdf_path if out_pdf_path and os.path.exists(out_pdf_path) else "",
+            convert_status
         ])
 
-    # запис у CSV (потокобезпечно всередині append_rows)
     append_rows(config.BILLS_CSV, bills_rows)
     append_rows(config.PASSAGE_CSV, passage_rows)
     append_rows(config.COMP_CSV, comp_rows)
 
     return {"ok": True, "skip": False, "downloaded": downloaded}
+
 
 def main():
     config.ensure_dirs()
@@ -140,7 +160,8 @@ def main():
     print(f"▶ Дати: {config.START_DATE.isoformat()} .. {config.END_DATE.isoformat()}")
     print(f"▶ Потоки: {config.MAX_WORKERS}, батч: {config.BATCH_SIZE}, convert_limit: {config.MAX_CONVERT_WORKERS}")
     print(f"▶ Вихід: {config.OUT_DIR}")
-    print("ℹКонвертація DOCX->PDF: Microsoft Word (COM/pywin32)")
+    print(f"▶ PDF папка: {config.PDF_DIR}")
+    print("ℹ️ Конвертація DOCX->PDF: Microsoft Word (COM/pywin32)")
 
     total_downloaded = 0
     total_matched = 0
@@ -158,7 +179,7 @@ def main():
                     total_downloaded += int(res.get("downloaded", 0))
 
         save_state(b_end + 1)
-        print(f"Батч {b_start}-{b_end} завершено. state -> {b_end + 1}. matched={total_matched}, downloaded={total_downloaded}")
+        print(f"✅ Батч {b_start}-{b_end} завершено. state -> {b_end + 1}. matched={total_matched}, downloaded={total_downloaded}")
 
     print("\nГОТОВО")
     print(f"Біллів у діапазоні дат: {total_matched}")

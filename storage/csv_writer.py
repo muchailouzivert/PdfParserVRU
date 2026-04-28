@@ -19,7 +19,7 @@ def ensure_csv_headers():
             csv.writer(f).writerow([
                 "card_id", "reg_num", "reg_date",
                 "file_id", "ext", "file_name", "title",
-                "saved_path", "download_status", "mime_type",
+                "tmp_path", "download_status", "mime_type",
                 "pdf_path", "convert_status"
             ])
 

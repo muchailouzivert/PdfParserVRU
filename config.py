@@ -36,6 +36,8 @@ HEADERS_BASE = {
     "Accept": "*/*",
 }
 
+PDF_DIR = os.path.join(OUT_DIR, "pdf")
+
 def ensure_dirs():
     os.makedirs(OUT_DIR, exist_ok=True)
     os.makedirs(FILES_DIR, exist_ok=True)
