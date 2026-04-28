@@ -45,7 +45,7 @@ def process_batch(batch_files: list, batch_num: int, total_batches: int) -> list
     return documents
 
 
-# ── Constants (defined before main so process_batch can see MAX_WORKERS) ──────
+# Constants (defined before main so process_batch can see MAX_WORKERS) 
 BATCH_SIZE = 200
 MAX_WORKERS = max(1, os.cpu_count() - 1)
 
