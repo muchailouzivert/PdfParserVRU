@@ -6,6 +6,7 @@ import networkx as nx
 from itertools import combinations
 from collections import defaultdict
 import pickle
+import community as community_louvain
 
 BASE_DIR    = Path("../dataset_comparative_2020_2026")
 input_path   = BASE_DIR / "comparative_files" / "clean_keywords_yake.parquet"
@@ -117,7 +118,6 @@ def compute_nx_metrics(G: rx.PyGraph, components: list) -> dict:
     nx_metrics["transitivity"]           = round(nx.transitivity(H), 6)
     nx_metrics["degree_assortativity"]   = round(nx.degree_assortativity_coefficient(H), 6)
 
-    import community as community_louvain
     partition  = community_louvain.best_partition(H)
     num_comm   = len(set(partition.values()))
     modularity = community_louvain.modularity(partition, H)
