@@ -2,6 +2,7 @@ from pathlib import Path
 import pandas as pd
 import json
 import os
+import yake
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 BASE_DIR    = Path("../dataset_comparative_2020_2026")
