@@ -1,0 +1,17 @@
+{
+  "num_nodes": 8427,
+  "num_edges": 2855215,
+  "density": 0.080422,
+  "avg_degree": 677.635,
+  "max_degree": 3118,
+  "min_degree": 0,
+  "num_components": 1698,
+  "largest_component_size": 6724,
+  "isolated_nodes": 1691,
+  "clustering_coefficient": 0.780734,
+  "transitivity": 0.828329,
+  "degree_assortativity": 0.3905,
+  "num_communities_louvain": 7,
+  "modularity": 0.166171,
+  "min_shared_keywords": 1
+}

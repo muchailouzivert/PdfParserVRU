@@ -7,8 +7,8 @@ bills_path   = BASE_DIR / "bills.csv"
 comp_path    = BASE_DIR / "comparative_tables.csv"
 passage_path = BASE_DIR / "passage.csv"
 
-output_parquet = BASE_DIR / "comparative_files" / "comparative_tables_dataset.parquet"
-output_csv     = BASE_DIR / "comparative_files" / "comparative_tables_dataset.csv"
+output_parquet = BASE_DIR / "comparative_files" / "enriched_docs.parquet"
+output_csv     = BASE_DIR / "comparative_files" / "enriched_docs_meta.csv"
 
 
 def load_data():
