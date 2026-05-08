@@ -9,7 +9,7 @@ import pickle
 import community as community_louvain
 
 BASE_DIR    = Path("../dataset_comparative_2020_2026")
-input_path   = BASE_DIR / "comparative_files" / "clean_keywords_yake.parquet"
+input_path   = BASE_DIR / "comparative_files" / "keywords_yake.parquet"
 graph_dir    = BASE_DIR / "comparative_files"
 
 # Поріг мінімальної кількості спільних ключових слів для створення ребра між документами
