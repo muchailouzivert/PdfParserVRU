@@ -17,7 +17,7 @@ graph_dir    = BASE_DIR / "comparative_files"
 # MIN_SHARED=2 — баланс між щільністю і структурою (883k ребер)
 # MIN_SHARED=3 — розріджена мережа, лише найсильніші тематичні зв'язки
 
-MIN_SHARED = 3
+MIN_SHARED = 1
 
 
 def build_inverted_index(df: pd.DataFrame) -> dict:
@@ -156,9 +156,9 @@ def main():
 
     graph_dir.mkdir(parents=True, exist_ok=True)
 
-    graph_file   = graph_dir / f"graph_min{MIN_SHARED}.pkl"
-    nx_file      = graph_dir / f"graph_nx_min{MIN_SHARED}.pkl"
-    metrics_file = graph_dir / f"metrics_min{MIN_SHARED}.json"
+    graph_file   = graph_dir / f"graph_min_yake{MIN_SHARED}.pkl"
+    nx_file      = graph_dir / f"graph_nx_min_yake{MIN_SHARED}.pkl"
+    metrics_file = graph_dir / f"metrics_min_yake{MIN_SHARED}.json"
 
     with open(graph_file, "wb") as f:
         pickle.dump(G, f)

@@ -29,7 +29,8 @@ def process_batch(batch: list, kw_model: KeyBERT) -> list:
             keyphrase_ngram_range=(1, 2),
             stop_words=None,
             top_n=k_max,
-            use_mmr=False,
+            use_mmr=True,
+            diversity=0.5,
         )
     except Exception as e:
         print(f"Помилка батчу: {e}")

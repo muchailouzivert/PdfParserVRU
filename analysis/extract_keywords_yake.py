@@ -26,7 +26,7 @@ def extract_yake(args: tuple) -> dict:
     extractor = yake.KeywordExtractor(
         lan="uk",
         n=2,
-        dedupLim=0.7,
+        dedupLim=0.5,
         top=k,
     )
     try:
