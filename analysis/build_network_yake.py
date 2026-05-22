@@ -11,20 +11,51 @@ import community as community_louvain
 import math
 import random
 
-BASE_DIR     = Path("D:/DIPLOM/PdfParserVRU/dataset_comparative_2020_2026")
-input_path   = BASE_DIR / "comparative_files" / "yake_filter" / "keywords_yake_filter_2.parquet"
-# input_path   = BASE_DIR / "comparative_files" / "keywords_yake_filtered.parquet"
-graph_dir    = BASE_DIR / "comparative_files"
+BASE_DIR = Path("D:/DIPLOM/PdfParserVRU/dataset_comparative_2020_2026")
 
-# Поріг мінімальної кількості спільних KW для створення ребра
+KEYWORD_COL = "keywords_yake"
 MIN_SHARED = 2
+
+# MODE:
+# "original"  — звичайний Yake
+# "filtered"  — Yake після фільтрації частих KW
+
+MODE = "filtered"
+# MODE = "original"
+
+if MODE == "filtered":
+    INPUT_DIR = BASE_DIR / "comparative_files" / "keywords_yake_filtred"
+    OUTPUT_DIR = BASE_DIR / "comparative_files" / "yake_Filtred_metrics"
+
+    INPUT_FILES = [
+        INPUT_DIR / "keywords_yake_filtred_2pct.parquet",
+        INPUT_DIR / "keywords_yake_filtred_4pct.parquet",
+        INPUT_DIR / "keywords_yake_filtred_6pct.parquet",
+        INPUT_DIR / "keywords_yake_filtred_8pct.parquet",
+        INPUT_DIR / "keywords_yake_filtred_10pct.parquet",
+    ]
+
+elif MODE == "original":
+    INPUT_DIR = BASE_DIR / "comparative_files" / "yake"
+    OUTPUT_DIR = BASE_DIR / "comparative_files" / "yake_metrics"
+
+    INPUT_FILES = [
+        INPUT_DIR / "keywords_yake_2.parquet",
+        INPUT_DIR / "keywords_yake_4.parquet",
+        INPUT_DIR / "keywords_yake_6.parquet",
+        INPUT_DIR / "keywords_yake_8.parquet",
+        INPUT_DIR / "keywords_yake_10.parquet",
+    ]
+
+else:
+    raise ValueError("MODE має бути 'filtered' або 'original'")
 
 
 def build_inverted_index(df: pd.DataFrame) -> dict:
     index = defaultdict(set)
     for _, row in df.iterrows():
         try:
-            kw_list = json.loads(row["keywords_yake"])
+            kw_list = json.loads(row[KEYWORD_COL])
             for kw in kw_list:
                 index[kw.lower().strip()].add(row["doc_id"])
         except:
@@ -193,12 +224,24 @@ def compute_nx_metrics(G: rx.PyGraph, components: list) -> tuple:
     return nx_metrics, H, partition
 
 
-def main():
+def process_dataset(input_path: Path):
     total_start = time.time()
+
+    filter_name = input_path.stem
+    output_prefix = f"{filter_name}_{MIN_SHARED}"
+
+    print("\n" + "=" * 80)
+    print(f"START: {input_path.name}")
+    print("=" * 80)
 
     print("Завантажуємо дані...")
     df = pd.read_parquet(input_path)
+    print(f"  Файл: {input_path}")
     print(f"  Документів: {len(df):,}")
+    print(f"  Колонка KW: {KEYWORD_COL}")
+
+    if KEYWORD_COL not in df.columns:
+        raise ValueError(f"У файлі немає колонки: {KEYWORD_COL}")
 
     print("\nБудуємо інвертований індекс...")
     index = build_inverted_index(df)
@@ -214,18 +257,22 @@ def main():
 
     print("\nРахуємо метрики...")
     metrics, components, degrees = compute_metrics(G)
-    nx_metrics, H, partition     = compute_nx_metrics(G, components)
+    nx_metrics, H, partition = compute_nx_metrics(G, components)
 
-    # Прибираємо degree_distribution з основних метрик — зберігаємо окремо
     degree_dist = metrics.pop("degree_distribution")
 
     all_metrics = {
         **metrics,
         **nx_metrics,
         "min_shared_keywords": MIN_SHARED,
+        "input_file": str(input_path),
+        "filter_name": filter_name,
+        "keyword_column": KEYWORD_COL,
+        "mode": MODE,
     }
 
     print("\n Метрики ")
+
     print(f"\n  [Зв'язність]")
     print(f"  {'is_connected':<40}: {all_metrics['is_connected']}")
     print(f"  {'num_components':<40}: {all_metrics['num_components']}")
@@ -258,35 +305,98 @@ def main():
     print(f"  {'density':<40}: {all_metrics['density']}")
 
     total_time = time.time() - total_start
-    print(f"\n── Загальний час: {total_time:.1f}с ({total_time/60:.1f} хв) ──")
+    all_metrics["total_time_seconds"] = round(total_time, 2)
 
-    graph_dir = BASE_DIR / "comparative_files" / "yake_metrics"
-    graph_dir.mkdir(parents=True, exist_ok=True)
+    print(f"\n── Загальний час: {total_time:.1f}с ({total_time / 60:.1f} хв) ──")
 
-    graph_file   = graph_dir / f"graph_yake_min2_{MIN_SHARED}.pkl"
-    nx_file      = graph_dir / f"graph_nx_yake_min2_{MIN_SHARED}.pkl"
-    metrics_file = graph_dir / f"metrics_yake_min2_{MIN_SHARED}.json"
-    degree_file  = graph_dir / f"degree_dist_yake_min2_{MIN_SHARED}.json"
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    graph_file = OUTPUT_DIR / f"{output_prefix}_rustworkx.pkl"
+    nx_file = OUTPUT_DIR / f"{output_prefix}_networkx.pkl"
+    metrics_file = OUTPUT_DIR / f"{output_prefix}_metrics.json"
+    degree_file = OUTPUT_DIR / f"{output_prefix}_degree_distribution.json"
+    partition_file = OUTPUT_DIR / f"{output_prefix}_partition.json"
 
     with open(graph_file, "wb") as f:
         pickle.dump(G, f)
+
     with open(nx_file, "wb") as f:
         pickle.dump(H, f)
+
     with open(metrics_file, "w", encoding="utf-8") as f:
         json.dump(all_metrics, f, ensure_ascii=False, indent=2)
+
     with open(degree_file, "w", encoding="utf-8") as f:
         json.dump(degree_dist, f, ensure_ascii=False, indent=2)
 
-    # Зберігаємо partition для візуалізації спільнот
-    partition_file = graph_dir / f"partition_yake_min2_{MIN_SHARED}.json"
     with open(partition_file, "w", encoding="utf-8") as f:
-        json.dump({str(k): v for k, v in partition.items()}, f, indent=2)
+        json.dump({str(k): v for k, v in partition.items()}, f, ensure_ascii=False, indent=2)
 
-    print(f"\nГраф (rustworkx) → {graph_file}")
-    print(f"Граф (networkx)  → {nx_file}")
-    print(f"Метрики          → {metrics_file}")
-    print(f"Розподіл ступенів → {degree_file}")
-    print(f"Partition        → {partition_file}")
+    print(f"\nГраф (rustworkx)     → {graph_file}")
+    print(f"Граф (networkx)      → {nx_file}")
+    print(f"Метрики              → {metrics_file}")
+    print(f"Розподіл ступенів    → {degree_file}")
+    print(f"Partition            → {partition_file}")
+
+    return all_metrics
+
+
+def main():
+    all_results = []
+
+    for input_path in INPUT_FILES:
+        if not input_path.exists():
+            print("\n" + "!" * 80)
+            print(f"Файл не знайдено: {input_path}")
+            print("Пропускаємо...")
+            print("!" * 80)
+            continue
+
+        try:
+            result = process_dataset(input_path)
+            all_results.append(result)
+
+        except Exception as e:
+            print("\n" + "!" * 80)
+            print(f"Помилка при обробці файлу: {input_path.name}")
+            print(e)
+            print("!" * 80)
+
+    if all_results:
+        summary_df = pd.DataFrame(all_results)
+
+        summary_file_csv = OUTPUT_DIR / f"yake_all_metrics_min_shared_{MIN_SHARED}_{MODE}.csv"
+        summary_file_json = OUTPUT_DIR / f"yake_all_metrics_min_shared_{MIN_SHARED}_{MODE}.json"
+
+        summary_df.to_csv(summary_file_csv, index=False, encoding="utf-8-sig")
+
+        with open(summary_file_json, "w", encoding="utf-8") as f:
+            json.dump(all_results, f, ensure_ascii=False, indent=2)
+
+        print("\n" + "=" * 80)
+        print("УСІ ФАЙЛИ ОБРОБЛЕНО")
+        print("=" * 80)
+        print(f"Зведена таблиця CSV  → {summary_file_csv}")
+        print(f"Зведений JSON        → {summary_file_json}")
+
+        print("\nКороткий підсумок:")
+        print(
+            summary_df[
+                [
+                    "filter_name",
+                    "num_nodes",
+                    "num_edges",
+                    "largest_component_pct",
+                    "isolated_nodes",
+                    "clustering_coefficient",
+                    "avg_degree",
+                    "modularity",
+                    "is_small_world",
+                ]
+            ]
+        )
+    else:
+        print("Жоден файл не був оброблений.")
 
 
 if __name__ == "__main__":
