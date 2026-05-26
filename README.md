@@ -75,7 +75,8 @@ PdfParserVRU/
 └── community_analysis/
     └── results/
         └── keybert_6pct/
-  
+```
+
 ## Залежності
 
 ```bash
