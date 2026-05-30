@@ -156,12 +156,12 @@ def main():
     ensure_csv_headers()
 
     start_from = load_state(config.CARD_ID_START)
-    print(f"▶ Старт card_id={start_from} .. {config.CARD_ID_END}")
-    print(f"▶ Дати: {config.START_DATE.isoformat()} .. {config.END_DATE.isoformat()}")
-    print(f"▶ Потоки: {config.MAX_WORKERS}, батч: {config.BATCH_SIZE}, convert_limit: {config.MAX_CONVERT_WORKERS}")
-    print(f"▶ Вихід: {config.OUT_DIR}")
-    print(f"▶ PDF папка: {config.PDF_DIR}")
-    print("ℹ️ Конвертація DOCX->PDF: Microsoft Word (COM/pywin32)")
+    print(f"Старт card_id={start_from} .. {config.CARD_ID_END}")
+    print(f"Дати: {config.START_DATE.isoformat()} .. {config.END_DATE.isoformat()}")
+    print(f"Потоки: {config.MAX_WORKERS}, батч: {config.BATCH_SIZE}, convert_limit: {config.MAX_CONVERT_WORKERS}")
+    print(f"Вихід: {config.OUT_DIR}")
+    print(f"PDF папка: {config.PDF_DIR}")
+    print("Конвертація DOCX->PDF: Microsoft Word (COM/pywin32)")
 
     total_downloaded = 0
     total_matched = 0
@@ -179,7 +179,7 @@ def main():
                     total_downloaded += int(res.get("downloaded", 0))
 
         save_state(b_end + 1)
-        print(f"✅ Батч {b_start}-{b_end} завершено. state -> {b_end + 1}. matched={total_matched}, downloaded={total_downloaded}")
+        print(f"Батч {b_start}-{b_end} завершено. state -> {b_end + 1}. matched={total_matched}, downloaded={total_downloaded}")
 
     print("\nГОТОВО")
     print(f"Біллів у діапазоні дат: {total_matched}")

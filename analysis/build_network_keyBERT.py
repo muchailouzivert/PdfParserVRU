@@ -21,7 +21,7 @@ BATCH_SIZE = 500
 # "original"  — звичайний KeyBERT
 # "filtered"  — KeyBERT після фільтрації частих KW
 
-MODE = "original"
+MODE = "filtered"
 # MODE = "filtered"
 
 if MODE == "original":
